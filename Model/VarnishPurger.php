@@ -369,7 +369,7 @@ class VarnishPurger implements VarnishPurgerInterface
             $this->purgeBaseUrls = $this->purgingConfigProvider->getCustomPurgeHosts();
         } else {
             $baseUrl = $this->scopeConfig->getValue(
-                Store::XML_PATH_UNSECURE_BASE_URL,
+                Store::XML_PATH_SECURE_BASE_URL,
                 ScopeInterface::SCOPE_STORE,
                 $this->storeViewId
             );
@@ -389,7 +389,7 @@ class VarnishPurger implements VarnishPurgerInterface
     private function setRegenBaseUrl(): void
     {
         $this->regenBaseUrl = $this->scopeConfig->getValue(
-            Store::XML_PATH_UNSECURE_BASE_URL,
+            Store::XML_PATH_SECURE_BASE_URL,
             ScopeInterface::SCOPE_STORE,
             $this->storeViewId
         );
