@@ -23,6 +23,8 @@
                       xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\PurgeWildcardCommand</item>
                 <item name="cache-purge-force"
                       xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\PurgeWildcardWithoutRegenerationCommand</item>
+                <item name="cache-all"
+                    xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\RegenerateAllCommand</item>
             </argument>
         </arguments>
     </type>
