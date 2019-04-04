@@ -226,6 +226,20 @@ class VarnishPurger implements VarnishPurgerInterface
     }
 
     /**
+     * Regen homepage, categories, products
+     * @return void
+     */
+    public function regenerateAll(): void
+    {
+        $this->lock();
+        $this->addUrlToRegenerate('');
+        $this->processProductsRegenerate();
+        $this->processProductsRegenerate();
+        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->unlock();
+    }
+
+    /**
      * @param int $storeViewId
      */
     public function setStoreViewId(int $storeViewId)
@@ -294,6 +308,17 @@ class VarnishPurger implements VarnishPurgerInterface
         $categories = $this->getCategories();
         foreach ($categories as $category) {
             $this->addUrlToPurge($category['request_path'], true);
+        }
+    }
+
+    /**
+     * @return void
+     */
+    private function processCategoriesRegenerate(): void
+    {
+        $categories = $this->getCategories();
+        foreach ($categories as $category) {
+            $this->addUrlToRegenerate($category['request_path']);
         }
     }
 

@@ -71,6 +71,12 @@ interface VarnishPurgerInterface
     public function purgeProduct(ProductInterface $product): void;
 
     /**
+     * Regen homepage, categories, products
+     * @return void
+     */
+    public function regenerateAll(): void;
+
+    /**
      * @param int $storeViewId
      */
     public function setStoreViewId(int $storeViewId);
