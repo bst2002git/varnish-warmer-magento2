@@ -15,6 +15,7 @@ use LizardMedia\VarnishWarmer\Api\LockHandler\LockInterface;
 use LizardMedia\VarnishWarmer\Api\QueueHandler\VarnishUrlPurgerInterface;
 use LizardMedia\VarnishWarmer\Api\QueueHandler\VarnishUrlRegeneratorInterface;
 use LizardMedia\VarnishWarmer\Api\UrlProvider\CategoryUrlProviderInterface;
+use LizardMedia\VarnishWarmer\Api\UrlProvider\CmsPageUrlProviderInterface;
 use LizardMedia\VarnishWarmer\Api\UrlProvider\ProductUrlProviderInterface;
 use LizardMedia\VarnishWarmer\Api\VarnishPurgerInterface;
 use LizardMedia\VarnishWarmer\Model\QueueHandler\VarnishUrlRegeneratorFactory;
@@ -45,7 +46,7 @@ class VarnishPurger implements VarnishPurgerInterface
      */
     protected $lockHandler;
 
-    /**
+    /**regenerateAll
      * @var ScopeConfigInterface
      */
     protected $scopeConfig;
@@ -54,6 +55,11 @@ class VarnishPurger implements VarnishPurgerInterface
      * @var ProductUrlProviderInterface
      */
     protected $productUrlProvider;
+
+    /**
+     * @var CmsPageUrlProviderInterface
+     */
+    protected $cmsPageUrlProvider;
 
     /**
      * @var CategoryUrlProviderInterface
@@ -89,6 +95,7 @@ class VarnishPurger implements VarnishPurgerInterface
      * @param ProductUrlProviderInterface $productUrlProvider
      * @param CategoryUrlProviderInterface $categoryUrlProvider
      * @param PurgingConfigProviderInterface $purgingConfigProvider
+     * @param CmsPageUrlProviderInterface $cmsPageUrlProvider
      */
     public function __construct(
         VarnishUrlRegeneratorFactory $varnishUrlRegeneratorFactory,
@@ -97,13 +104,15 @@ class VarnishPurger implements VarnishPurgerInterface
         ScopeConfigInterface $scopeConfig,
         ProductUrlProviderInterface $productUrlProvider,
         CategoryUrlProviderInterface $categoryUrlProvider,
-        PurgingConfigProviderInterface $purgingConfigProvider
+        PurgingConfigProviderInterface $purgingConfigProvider,
+        CmsPageUrlProviderInterface $cmsPageUrlProvider
     ) {
         $this->lockHandler = $lockHandler;
         $this->scopeConfig = $scopeConfig;
         $this->productUrlProvider = $productUrlProvider;
         $this->categoryUrlProvider = $categoryUrlProvider;
         $this->purgingConfigProvider = $purgingConfigProvider;
+        $this->cmsPageUrlProvider = $cmsPageUrlProvider;
 
         /** @var VarnishUrlRegeneratorInterface varnishUrlRegenerator */
         $this->varnishUrlRegenerator = $varnishUrlRegeneratorFactory->create();
@@ -234,7 +243,8 @@ class VarnishPurger implements VarnishPurgerInterface
         $this->lock();
         $this->addUrlToRegenerate('');
         $this->processProductsRegenerate();
-        $this->processProductsRegenerate();
+        $this->processCategoriesRegenerate();
+        $this->processCmsPages();
         $this->varnishUrlRegenerator->runRegenerationQueue();
         $this->unlock();
     }
@@ -342,6 +352,22 @@ class VarnishPurger implements VarnishPurgerInterface
         foreach ($productUrls as $key => $url) {
             $this->addUrlToPurge($url['request_path'], true);
         }
+    }
+
+    private function processCmsPages(): void
+    {
+        $cmsPages = $this->getAllCmsPages();
+        foreach ($cmsPages as $key => $url) {
+            $this->addUrlToRegenerate($url['request_path']);
+        }
+    }
+
+    /**
+     * @return array
+     */
+    private function getAllCmsPages(): array
+    {
+        return $this->cmsPageUrlProvider->getActiveUrls();
     }
 
     /**

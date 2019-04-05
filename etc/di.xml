@@ -46,6 +46,9 @@
     <preference for="LizardMedia\VarnishWarmer\Api\LockHandler\LockInterface"
                 type="LizardMedia\VarnishWarmer\Model\LockHandler\FileLock" />
 
+    <preference for="LizardMedia\VarnishWarmer\Api\UrlProvider\CmsPageUrlProviderInterface"
+                type="LizardMedia\VarnishWarmer\Model\UrlProvider\CmsPageUrlProvider" />
+
     <preference for="LizardMedia\VarnishWarmer\Api\UrlProvider\CategoryUrlProviderInterface"
                 type="LizardMedia\VarnishWarmer\Model\UrlProvider\CategoryUrlProvider" />
 
