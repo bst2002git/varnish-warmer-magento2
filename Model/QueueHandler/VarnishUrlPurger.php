@@ -17,6 +17,7 @@ use LizardMedia\VarnishWarmer\Model\Adapter\ReactPHP\ClientFactory;
 use Psr\Log\LoggerInterface;
 use React\HttpClient\Response;
 use React\EventLoop\Factory;
+use Magento\Framework\App\Http\Context;
 
 /**
  * Class VarnishUrlPurger
@@ -47,6 +48,7 @@ class VarnishUrlPurger extends AbstractQueueHandler implements VarnishUrlPurgerI
      * @param Factory $loopFactory
      * @param ClientFactory $clientFactory
      * @param PurgingConfigProviderInterface $purgingConfigProvider
+     * @param Context $context
      */
     public function __construct(
         GeneralConfigProviderInterface $configProvider,
@@ -54,9 +56,10 @@ class VarnishUrlPurger extends AbstractQueueHandler implements VarnishUrlPurgerI
         QueueProgressLoggerInterface $queueProgressLogger,
         Factory $loopFactory,
         ClientFactory $clientFactory,
-        PurgingConfigProviderInterface $purgingConfigProvider
+        PurgingConfigProviderInterface $purgingConfigProvider,
+        Context $context
     ) {
-        parent::__construct($configProvider, $logger, $queueProgressLogger, $loopFactory, $clientFactory);
+        parent::__construct($configProvider, $logger, $queueProgressLogger, $loopFactory, $clientFactory, $context);
         $this->purgingConfigProvider = $purgingConfigProvider;
     }
 

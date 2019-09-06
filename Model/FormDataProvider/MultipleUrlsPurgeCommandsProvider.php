@@ -22,6 +22,7 @@ final class MultipleUrlsPurgeCommandsProvider
     public function getCommandArray(): array
     {
         return [
+            'lizardmediavarnish/purge/cacheall' => __('Varnish: Re-Cache All'),
             'lizardmediavarnish/purge/purgehomepage' => __('Varnish: purge HP'),
             'lizardmediavarnish/purge/purgegeneral' => __('Varnish: purge HP, Categories'),
             'lizardmediavarnish/purge/purgeall' => __('Varnish: purge HP, Categories, Products (long)'),

@@ -70,7 +70,10 @@ class VarnishUrlRegenerator extends AbstractQueueHandler implements VarnishUrlRe
     private function createRequest(string $url): void
     {
         $client = $this->clientFactory->create($this->loop);
-        $request = $client->request('GET', $url);
+        $varyString = $this->context->getVaryString();
+        $request = $client->request('GET', $url, $varyString ? [
+            'Cookie' => 'X-Magento-Vary=' . $varyString
+        ] : []);
         $request->on('response', function (Response $response) use ($url) {
             $response->on(
                 'end',
