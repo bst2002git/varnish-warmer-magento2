@@ -23,6 +23,8 @@
                       xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\PurgeWildcardCommand</item>
                 <item name="cache-purge-force"
                       xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\PurgeWildcardWithoutRegenerationCommand</item>
+                <item name="cache-all"
+                    xsi:type="object">LizardMedia\VarnishWarmer\Console\Command\RegenerateAllCommand</item>
             </argument>
         </arguments>
     </type>
@@ -43,6 +45,9 @@
 
     <preference for="LizardMedia\VarnishWarmer\Api\LockHandler\LockInterface"
                 type="LizardMedia\VarnishWarmer\Model\LockHandler\FileLock" />
+
+    <preference for="LizardMedia\VarnishWarmer\Api\UrlProvider\CmsPageUrlProviderInterface"
+                type="LizardMedia\VarnishWarmer\Model\UrlProvider\CmsPageUrlProvider" />
 
     <preference for="LizardMedia\VarnishWarmer\Api\UrlProvider\CategoryUrlProviderInterface"
                 type="LizardMedia\VarnishWarmer\Model\UrlProvider\CategoryUrlProvider" />

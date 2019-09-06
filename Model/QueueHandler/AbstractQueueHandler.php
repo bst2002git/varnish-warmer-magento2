@@ -14,6 +14,7 @@ use LizardMedia\VarnishWarmer\Model\Adapter\ReactPHP\ClientFactory;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\Factory;
+use Magento\Framework\App\Http\Context;
 
 /**
  * Class AbstractQueueHandler
@@ -62,25 +63,33 @@ abstract class AbstractQueueHandler
     protected $clientFactory;
 
     /**
+     * @var Context
+     */
+    protected $context;
+
+    /**
      * AbstractQueueHandler constructor.
      * @param GeneralConfigProviderInterface $configProvider
      * @param LoggerInterface $logger
      * @param QueueProgressLoggerInterface $queueProgressLogger
      * @param Factory $loopFactory
      * @param ClientFactory $clientFactory
+     * @param Context $context
      */
     public function __construct(
         GeneralConfigProviderInterface $configProvider,
         LoggerInterface $logger,
         QueueProgressLoggerInterface $queueProgressLogger,
         Factory $loopFactory,
-        ClientFactory $clientFactory
+        ClientFactory $clientFactory,
+        Context $context
     ) {
         $this->configProvider = $configProvider;
         $this->logger = $logger;
         $this->queueProgressLogger = $queueProgressLogger;
         $this->loop = $loopFactory::create();
         $this->clientFactory = $clientFactory;
+        $this->context = $context;
     }
 
     /**
