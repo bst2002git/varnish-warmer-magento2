@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
 
 /**
- * File:VarnishPurger.php
+ * File:VarnishActionManager.php
  *
  * @author Maciej Sławik <maciej.slawik@lizardmedia.pl>
+ * @author Bartosz Kubicki <bartosz.kubicki@lizardmedia.pl>
  * @copyright Copyright (C) 2019 Lizard Media (http://lizardmedia.pl)
  */
 
@@ -16,72 +18,97 @@ use LizardMedia\VarnishWarmer\Api\QueueHandler\VarnishUrlPurgerInterface;
 use LizardMedia\VarnishWarmer\Api\QueueHandler\VarnishUrlRegeneratorInterface;
 use LizardMedia\VarnishWarmer\Api\UrlProvider\CategoryUrlProviderInterface;
 use LizardMedia\VarnishWarmer\Api\UrlProvider\ProductUrlProviderInterface;
-use LizardMedia\VarnishWarmer\Api\VarnishPurgerInterface;
-use LizardMedia\VarnishWarmer\Model\QueueHandler\VarnishUrlRegeneratorFactory;
+use LizardMedia\VarnishWarmer\Api\VarnishActionManagerInterface;
 use LizardMedia\VarnishWarmer\Model\QueueHandler\VarnishUrlPurgerFactory;
+use LizardMedia\VarnishWarmer\Model\QueueHandler\VarnishUrlRegeneratorFactory;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\Store;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
- * Class VarnishPurger
+ * TODO: Refactor, decouple
+ * Class VarnishActionManager
  * @package LizardMedia\VarnishWarmer\Model
+ * @SuppressWarnings(PHPMD.LongVariable)
  */
-class VarnishPurger implements VarnishPurgerInterface
+class VarnishActionManager implements VarnishActionManagerInterface
 {
     /**
-     * @var VarnishUrlRegeneratorInterface
+     * @var int
      */
-    protected $varnishUrlRegenerator;
-
-    /**
-     * @var VarnishUrlPurgerInterface
-     */
-    protected $varnishUrlPurger;
-
-    /**
-     * @var LockInterface
-     */
-    protected $lockHandler;
-
-    /**
-     * @var ScopeConfigInterface
-     */
-    protected $scopeConfig;
-
-    /**
-     * @var ProductUrlProviderInterface
-     */
-    protected $productUrlProvider;
-
-    /**
-     * @var CategoryUrlProviderInterface
-     */
-    protected $categoryUrlProvider;
-
-    /**
-     * @var PurgingConfigProviderInterface
-     */
-    protected $purgingConfigProvider;
+    private const DEFAULT_FRONTEND_STORE_VIEW_ID = 1;
 
     /**
      * @var array
      */
-    protected $purgeBaseUrls;
+    private $purgeBaseUrls;
 
     /**
      * @var string
      */
-    protected $regenBaseUrl;
+    private $regenBaseUrl;
 
     /**
      * @var int
      */
-    protected $storeViewId;
+    private $storeViewId;
 
     /**
-     * VarnishPurger constructor.
+     * @var bool
+     */
+    private $isStoreCodeUsedInUrls;
+
+    /**
+     * @var StoreInterface
+     */
+    private $currentStoreView;
+
+    /**
+     * @var VarnishUrlRegeneratorInterface
+     */
+    private $varnishUrlRegenerator;
+
+    /**
+     * @var VarnishUrlPurgerInterface
+     */
+    private $varnishUrlPurger;
+
+    /**
+     * @var LockInterface
+     */
+    private $lockHandler;
+
+    /**
+     * @var ScopeConfigInterface
+     */
+    private $scopeConfig;
+
+    /**
+     * @var ProductUrlProviderInterface
+     */
+    private $productUrlProvider;
+
+    /**
+     * @var CategoryUrlProviderInterface
+     */
+    private $categoryUrlProvider;
+
+    /**
+     * @var PurgingConfigProviderInterface
+     */
+    private $purgingConfigProvider;
+
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * VarnishActionManager constructor.
      * @param VarnishUrlRegeneratorFactory $varnishUrlRegeneratorFactory
      * @param VarnishUrlPurgerFactory $varnishUrlPurgerFactory
      * @param LockInterface $lockHandler
@@ -89,6 +116,9 @@ class VarnishPurger implements VarnishPurgerInterface
      * @param ProductUrlProviderInterface $productUrlProvider
      * @param CategoryUrlProviderInterface $categoryUrlProvider
      * @param PurgingConfigProviderInterface $purgingConfigProvider
+     * @param StoreManagerInterface $storeManager
+     * @SuppressWarnings(PHPMD.LongVariable)
+     * @throws NoSuchEntityException
      */
     public function __construct(
         VarnishUrlRegeneratorFactory $varnishUrlRegeneratorFactory,
@@ -97,7 +127,8 @@ class VarnishPurger implements VarnishPurgerInterface
         ScopeConfigInterface $scopeConfig,
         ProductUrlProviderInterface $productUrlProvider,
         CategoryUrlProviderInterface $categoryUrlProvider,
-        PurgingConfigProviderInterface $purgingConfigProvider
+        PurgingConfigProviderInterface $purgingConfigProvider,
+        StoreManagerInterface $storeManager
     ) {
         $this->lockHandler = $lockHandler;
         $this->scopeConfig = $scopeConfig;
@@ -109,12 +140,16 @@ class VarnishPurger implements VarnishPurgerInterface
         $this->varnishUrlRegenerator = $varnishUrlRegeneratorFactory->create();
         /** @var VarnishUrlPurgerInterface varnishUrlPurger */
         $this->varnishUrlPurger = $varnishUrlPurgerFactory->create();
+        $this->storeManager = $storeManager;
+        $this->storeViewId = $this->getDefaultStoreViewId();
+        $this->isStoreCodeUsedInUrls = $this->isStoreCodeUsedInUrls();
     }
 
     /**
      * Purge *
      * Regen homepage, categories, products
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeWildcard(): void
     {
@@ -123,8 +158,8 @@ class VarnishPurger implements VarnishPurgerInterface
         $this->addUrlToRegenerate('');
         $this->regenerateCategories();
         $this->processProductsRegenerate();
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
         $this->unlock();
     }
 
@@ -132,17 +167,19 @@ class VarnishPurger implements VarnishPurgerInterface
      * Purge * without any regeneration
      * Pass through lock
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeWildcardWithoutRegen(): void
     {
         $this->addUrlToPurge('*');
-        $this->varnishUrlPurger->runPurgeQueue();
+        $this->varnishUrlPurger->purge();
     }
 
     /**
      * Purge homepage, categories, products
      * Regen homepage, categories, products
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeAll(): void
     {
@@ -151,8 +188,8 @@ class VarnishPurger implements VarnishPurgerInterface
         $this->addUrlToRegenerate('');
         $this->processCategoriesPurgeAndRegenerate();
         $this->processProductsPurgeAndRegenerate();
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
         $this->unlock();
     }
 
@@ -160,6 +197,7 @@ class VarnishPurger implements VarnishPurgerInterface
      * Purge homepage, categories
      * Regen homepage, categories
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeGeneral(): void
     {
@@ -167,8 +205,8 @@ class VarnishPurger implements VarnishPurgerInterface
         $this->addUrlToPurge('');
         $this->addUrlToRegenerate('');
         $this->processCategoriesPurgeAndRegenerate();
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
         $this->unlock();
     }
 
@@ -176,59 +214,65 @@ class VarnishPurger implements VarnishPurgerInterface
      * Purge homepage
      * Regen homepage
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeHomepage(): void
     {
         $this->lock();
         $this->addUrlToPurge('');
         $this->addUrlToRegenerate('');
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
         $this->unlock();
     }
 
     /**
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeAndRegenerateProducts(): void
     {
         $this->lock();
         $this->processProductsPurgeAndRegenerate();
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
         $this->unlock();
     }
 
     /**
      * @param string $url
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeAndRegenerateUrl(string $url): void
     {
         $this->addUrlToPurge($url);
         $this->addUrlToRegenerate($url);
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
     }
 
     /**
      * @param ProductInterface $product
      * @return void
+     * @throws NoSuchEntityException
      */
     public function purgeProduct(ProductInterface $product): void
     {
-        $productUrls = $this->getProductUrls($product->getId());
+        $productUrls = $this->getProductUrls((int) $product->getId());
+
         foreach ($productUrls as $url) {
             $this->addUrlToPurge($url['request_path'], true);
         }
-        $this->varnishUrlPurger->runPurgeQueue();
-        $this->varnishUrlRegenerator->runRegenerationQueue();
+
+        $this->varnishUrlPurger->purge();
+        $this->varnishUrlRegenerator->regenerate();
     }
 
     /**
      * @param int $storeViewId
      */
-    public function setStoreViewId(int $storeViewId)
+    public function setStoreViewId(int $storeViewId): void
     {
         $this->storeViewId = $storeViewId;
     }
@@ -250,15 +294,41 @@ class VarnishPurger implements VarnishPurgerInterface
     }
 
     /**
+     * @return int
+     * @throws NoSuchEntityException
+     */
+    private function getDefaultStoreViewId(): int
+    {
+        $defaultStoreView = $this->storeManager->getStore(self::DEFAULT_FRONTEND_STORE_VIEW_ID);
+        return $defaultStoreView instanceof StoreInterface
+            ? (int) $defaultStoreView->getId()
+            : 1;
+    }
+
+    /**
+     * @return bool
+     */
+    private function isStoreCodeUsedInUrls(): bool
+    {
+        if (empty($this->isStoreCodeUsedInUrls)) {
+            $this->isStoreCodeUsedInUrls = $this->scopeConfig->isSetFlag(Store::XML_PATH_STORE_IN_URL);
+        }
+
+        return $this->isStoreCodeUsedInUrls;
+    }
+
+    /**
      * @param $relativeUrl
      * @param bool $autoRegenerate
      * @return void
+     * @throws NoSuchEntityException
      */
-    private function addUrlToPurge($relativeUrl, $autoRegenerate = false): void
+    private function addUrlToPurge(string $relativeUrl, bool $autoRegenerate = false): void
     {
         foreach ($this->getPurgeBaseUrls() as $purgeBaseUrl) {
-            $url = $purgeBaseUrl . $relativeUrl;
+            $url = $purgeBaseUrl . $this->buildStoreCodePartIfUsed() .  $relativeUrl;
             $this->varnishUrlPurger->addUrlToPurge($url);
+
             if ($autoRegenerate) {
                 $this->addUrlToRegenerate($relativeUrl);
             }
@@ -266,21 +336,60 @@ class VarnishPurger implements VarnishPurgerInterface
     }
 
     /**
-     * @param $relativeUrl
+     * @param string $relativeUrl
      * @return void
+     * @throws NoSuchEntityException
      */
-    private function addUrlToRegenerate($relativeUrl): void
+    private function addUrlToRegenerate(string $relativeUrl): void
     {
-        $url = $this->getRegenBaseUrl() . $relativeUrl;
+        $url = $this->getRegenBaseUrl() . $this->buildStoreCodePartIfUsed() . $relativeUrl;
         $this->varnishUrlRegenerator->addUrlToRegenerate($url);
     }
 
     /**
+     * @return string
+     * @throws NoSuchEntityException
+     */
+    private function buildStoreCodePartIfUsed(): string
+    {
+        if ($this->isStoreCodeUsedInUrls) {
+            return sprintf('%s/', $this->getStoreCode());
+        }
+
+        return '';
+    }
+
+    /**
+     * @return string
+     * @throws NoSuchEntityException
+     */
+    private function getStoreCode(): string
+    {
+        $currentStore = $this->getCurrentStoreView();
+        return $currentStore->getCode();
+    }
+
+    /**
+     * @return StoreInterface
+     * @throws NoSuchEntityException
+     */
+    private function getCurrentStoreView(): StoreInterface
+    {
+        if (!$this->currentStoreView instanceof StoreInterface) {
+            $this->currentStoreView = $this->storeManager->getStore($this->storeViewId);
+        }
+
+        return $this->currentStoreView;
+    }
+
+    /**
      * @return void
+     * @throws NoSuchEntityException
      */
     private function regenerateCategories(): void
     {
         $categories = $this->getCategories();
+
         foreach ($categories as $category) {
             $this->addUrlToRegenerate($category['request_path']);
         }
@@ -288,10 +397,12 @@ class VarnishPurger implements VarnishPurgerInterface
 
     /**
      * @return void
+     * @throws NoSuchEntityException
      */
     private function processCategoriesPurgeAndRegenerate(): void
     {
         $categories = $this->getCategories();
+
         foreach ($categories as $category) {
             $this->addUrlToPurge($category['request_path'], true);
         }
@@ -299,22 +410,26 @@ class VarnishPurger implements VarnishPurgerInterface
 
     /**
      * @return void
+     * @throws NoSuchEntityException
      */
     private function processProductsRegenerate(): void
     {
         $productUrls = $this->getAllProductsUrls();
-        foreach ($productUrls as $key => $url) {
+
+        foreach ($productUrls as $url) {
             $this->addUrlToRegenerate($url['request_path']);
         }
     }
 
     /**
      * @return void
+     * @throws NoSuchEntityException
      */
     private function processProductsPurgeAndRegenerate(): void
     {
         $productUrls = $this->getAllProductsUrls();
-        foreach ($productUrls as $key => $url) {
+
+        foreach ($productUrls as $url) {
             $this->addUrlToPurge($url['request_path'], true);
         }
     }
@@ -331,7 +446,7 @@ class VarnishPurger implements VarnishPurgerInterface
      * @param $productId
      * @return array
      */
-    private function getProductUrls($productId): array
+    private function getProductUrls(int $productId): array
     {
         return $this->productUrlProvider->getProductUrls($productId);
     }
@@ -369,7 +484,7 @@ class VarnishPurger implements VarnishPurgerInterface
             $this->purgeBaseUrls = $this->purgingConfigProvider->getCustomPurgeHosts();
         } else {
             $baseUrl = $this->scopeConfig->getValue(
-                Store::XML_PATH_UNSECURE_BASE_URL,
+                Store::XML_PATH_SECURE_BASE_URL,
                 ScopeInterface::SCOPE_STORE,
                 $this->storeViewId
             );
@@ -377,8 +492,8 @@ class VarnishPurger implements VarnishPurgerInterface
         }
 
         foreach ($this->purgeBaseUrls as &$purgeBaseUrl) {
-            if (substr($purgeBaseUrl, -1) != "/") {
-                $purgeBaseUrl .= "/";
+            if (substr($purgeBaseUrl, -1) !== '/') {
+                $purgeBaseUrl .= '/';
             }
         }
     }
@@ -388,36 +503,38 @@ class VarnishPurger implements VarnishPurgerInterface
      */
     private function setRegenBaseUrl(): void
     {
-        $this->regenBaseUrl = $this->scopeConfig->getValue(
-            Store::XML_PATH_UNSECURE_BASE_URL,
+        $this->regenBaseUrl = (string) $this->scopeConfig->getValue(
+            Store::XML_PATH_SECURE_BASE_URL,
             ScopeInterface::SCOPE_STORE,
             $this->storeViewId
         );
 
-        if (substr($this->regenBaseUrl, -1) != "/") {
-            $this->regenBaseUrl .= "/";
+        if (substr($this->regenBaseUrl, -1) !== '/') {
+            $this->regenBaseUrl .= '/';
         }
     }
 
     /**
      * @return array
      */
-    private function getPurgeBaseUrls()
+    private function getPurgeBaseUrls(): array
     {
         if (!$this->purgeBaseUrls) {
             $this->setPurgeBaseUrls();
         }
+
         return $this->purgeBaseUrls;
     }
 
     /**
      * @return string
      */
-    private function getRegenBaseUrl()
+    private function getRegenBaseUrl(): string
     {
         if (!$this->regenBaseUrl) {
             $this->setRegenBaseUrl();
         }
+
         return $this->regenBaseUrl;
     }
 }

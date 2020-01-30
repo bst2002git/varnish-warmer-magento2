@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * File: RegenerateProductsCacheCommand.php
  *
@@ -9,8 +12,8 @@
 namespace LizardMedia\VarnishWarmer\Console\Command;
 
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Class RegenerateProductsCacheCommand
@@ -21,12 +24,12 @@ class RegenerateProductsCacheCommand extends AbstractPurgeCommand
     /**
      * @var string
      */
-    const CLI_COMMAND = 'lm-varnish:regenerate-products-cache';
+    public const CLI_COMMAND = 'lm-varnish:regenerate-products-cache';
 
     /**
-     * {@inheritdoc}
+     * @return void
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this->setName(self::CLI_COMMAND)
             ->setDescription(
@@ -39,11 +42,14 @@ class RegenerateProductsCacheCommand extends AbstractPurgeCommand
     }
 
     /**
-     * {@inheritdoc}
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return void
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): void
     {
-        $this->varnishPurger->setStoreViewId((int) $input->getOption(self::STORE_VIEW_ID));
-        $this->varnishPurger->purgeAndRegenerateProducts();
+        $this->passStoreViewIfSet($input);
+        $this->varnishActionManager->purgeAndRegenerateProducts();
     }
 }

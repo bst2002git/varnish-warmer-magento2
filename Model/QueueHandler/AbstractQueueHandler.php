@@ -1,8 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * File: AbstractQueueHandler.php
  *
  * @author Maciej Sławik <maciej.slawik@lizardmedia.pl>
+ * @author Bartosz Kubicki <bartosz.kubicki@lizardmedia.pl>
  * @copyright Copyright (C) 2019 Lizard Media (http://lizardmedia.pl)
  */
 
@@ -12,8 +16,8 @@ use LizardMedia\VarnishWarmer\Api\Config\GeneralConfigProviderInterface;
 use LizardMedia\VarnishWarmer\Api\ProgressHandler\QueueProgressLoggerInterface;
 use LizardMedia\VarnishWarmer\Model\Adapter\ReactPHP\ClientFactory;
 use Psr\Log\LoggerInterface;
-use React\EventLoop\LoopInterface;
 use React\EventLoop\Factory;
+use React\EventLoop\LoopInterface;
 
 /**
  * Class AbstractQueueHandler
@@ -95,11 +99,40 @@ abstract class AbstractQueueHandler
 
     /**
      * @param string $url
-     * @return null
+     * @return void
      */
-    protected function log(string $url)
+    abstract protected function createRequest(string $url): void;
+
+    /**
+     * @return void
+     */
+    protected function runQueue(): void
     {
-        $this->logger->debug("{$this->counter}/{$this->total}", ['url' => $url]);
+        while (!empty($this->urls)) {
+            for ($i = 0; $i < $this->getMaxNumberOfProcesses(); $i++) {
+                if (!empty($this->urls)) {
+                    $this->createRequest(array_pop($this->urls));
+                }
+            }
+
+            $this->loop->run();
+        }
+    }
+
+    /**
+     * @param string $url
+     * @param int|null $code
+     * @param array|null $headers
+     * @return void
+     */
+    protected function log(string $url, ?int $code = null, ?array $headers = []): void
+    {
+        $context = ['url' => $url, 'code' => $code, 'headers' => implode(',', $headers)];
+
+        $this->logger->debug(
+            "{$this->counter}/{$this->total}",
+            $context
+        );
     }
 
     /**
@@ -111,9 +144,9 @@ abstract class AbstractQueueHandler
     }
 
     /**
-     * @return null
+     * @return void
      */
-    protected function logProgress()
+    protected function logProgress(): void
     {
         $this->queueProgressLogger->logProgress($this->getQueueProcessType(), $this->counter, $this->total);
     }

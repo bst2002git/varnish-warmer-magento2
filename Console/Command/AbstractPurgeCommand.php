@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * File: AbstractPurgeCommand.php
  *
@@ -8,9 +11,9 @@
 
 namespace LizardMedia\VarnishWarmer\Console\Command;
 
-use LizardMedia\VarnishWarmer\Api\VarnishPurgerInterface;
+use LizardMedia\VarnishWarmer\Api\VarnishActionManagerInterface;
 use Symfony\Component\Console\Command\Command;
-use Magento\Framework\App\State;
+use Symfony\Component\Console\Input\InputInterface;
 
 /**
  * Class AbstractPurgeCommand
@@ -21,25 +24,36 @@ class AbstractPurgeCommand extends Command
     /**
      * @var string
      */
-    const STORE_VIEW_ID = 'store';
+    protected const STORE_VIEW_ID = 'store';
 
     /**
-     * @var VarnishPurgerInterface
+     * @var VarnishActionManagerInterface
      */
-    protected $varnishPurger;
+    protected $varnishActionManager;
 
     /**
      * AbstractPurgeCommand constructor.
-     * @param State $state
-     * @param VarnishPurgerInterface $varnishPurger
+     * @param VarnishActionManagerInterface $varnishActionManager
      * @param null $name
      */
     public function __construct(
-        State $state,
-        VarnishPurgerInterface $varnishPurger,
+        VarnishActionManagerInterface $varnishActionManager,
         $name = null
     ) {
-        $this->varnishPurger = $varnishPurger;
         parent::__construct($name);
+        $this->varnishActionManager = $varnishActionManager;
+    }
+
+    /**
+     * @param InputInterface $input
+     * @return void
+     */
+    protected function passStoreViewIfSet(InputInterface $input): void
+    {
+        $storeViewId = $input->getOption(self::STORE_VIEW_ID);
+
+        if (!empty($storeViewId)) {
+            $this->varnishActionManager->setStoreViewId((int) $storeViewId);
+        }
     }
 }
